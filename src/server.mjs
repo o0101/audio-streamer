@@ -5,12 +5,12 @@ import os from 'os';
 import http from 'http';
 import https from 'https';
 
+import exitOnEpipe from 'exit-on-epipe';
 import express from 'express';
 import WebRTC from '@koush/wrtc';
 import {WebSocketServer} from 'ws';
 
 let app;
-
 
 addHandlers();
 startServer();
@@ -18,6 +18,27 @@ startServer();
 function addHandlers() {
   app = express();
   app.use(express.static(path.resolve('src', 'client')));
+
+  app.get('/httpstream.wav', (request, response) => {
+    response.writeHead(200, {
+      'Connection': 'keep-alive',
+      'Content-Type': 'audio/wav'
+    });
+
+    const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
+
+    streamer.pipe(response);
+    exitOnEpipe(response);
+
+    streamer.on('close', function() {
+      response.end();
+    });
+
+    request.on('close', function() {
+      response.end();
+      streamer.close();
+    });
+  });
 }
 
 async function startServer() {
@@ -75,6 +96,9 @@ async function startServer() {
   });
 
   websocketServer.on('connection', async ws => {
+    const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
+    streamer.on('data', data => ws.send(data));
+    //streamer.on('close', () => ws.close());
     ws.on('message', async msg => {
       console.log('msg: %s', msg);
     });
@@ -96,6 +120,11 @@ async function startServer() {
   });
 
   await startup;
+
+  process.on('SIGINT', shutDown);
+  process.on('exit', shutDown);
+  // nodemon restart
+  process.on('SIGUSR2', shutDown);
 
   return httpServer;
 }
