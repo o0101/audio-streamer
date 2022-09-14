@@ -7,7 +7,7 @@ import https from 'https';
 
 import express from 'express';
 import WebRTC from '@koush/wrtc';
-import WebSockets from 'ws';
+import {WebSocketServer} from 'ws';
 
 let app;
 
@@ -21,6 +21,7 @@ function addHandlers() {
 }
 
 async function startServer() {
+  const sockets = new Set();
   const PORT = Number.isInteger(process.argv[2]) ? parseInt(process.argv[2]) : 8080;
   const SSL_CERTS = process.env.LOCAL_HTTPS ? 'localhost-sslcerts' : 'sslcerts';
   const GO_SECURE = fs.existsSync(path.resolve(os.homedir(), SSL_CERTS, 'privkey.pem'));
@@ -42,15 +43,49 @@ async function startServer() {
   }
 
   const secure = GO_SECURE && secure_options.cert && secure_options.key;
-  console.log({secure});
   const protocol = secure ? https : http;
-  const server = protocol.createServer.apply(protocol, secure ? [secure_options, app] : [app]);
+  const httpServer = protocol.createServer.apply(protocol, secure ? [secure_options, app] : [app]);
+  const websocketServer = new WebSocketServer({
+    server: httpServer,
+    perMessageDeflate: false,
+  });
+
+  let shuttingDown = false;
+
+  const shutDown = () => {
+    if ( shuttingDown ) return;
+    shuttingDown = true;
+    httpServer.close(() => console.info(`Server closed on SIGINT`));
+    sockets.forEach(socket => {
+      try { socket.destroy() } catch(e) {
+        DEBUG && console.warn(`MAIN SERVER: port ${httpServer_port}, error closing socket`, e)
+      }
+    });
+    process.exit(0);
+  };
+
+  httpServer.on('connection', socket => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+
+  httpServer.on('upgrade', (req, socket, head) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+
+  websocketServer.on('connection', async ws => {
+    ws.on('message', async msg => {
+      console.log('msg: %s', msg);
+    });
+    ws.on('error', err => console.warn('WebSocket error', err));
+  });
 
   let resolve, reject;
 
   const startup = new Promise((res, rej) => (resolve = res, reject = rej));
 
-  server.listen(PORT, err => {
+  httpServer.listen(PORT, err => {
     if ( err ) {
       console.error('Server start error', err);
       reject();
@@ -62,6 +97,6 @@ async function startServer() {
 
   await startup;
 
-  return server;
+  return httpServer;
 }
 
