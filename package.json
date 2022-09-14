@@ -1,0 +1,41 @@
+{
+  "name": "audio-streamer",
+  "version": "1.0.0",
+  "description": "nodejs server to web client audio streaming experiments",
+  "main": "src/server.mjs",
+  "type": "module",
+  "scripts": {
+    "test": "nodemon src/server.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/crisdosyago/audio-streamer.git"
+  },
+  "keywords": [
+    "audio",
+    "nodejs",
+    "streaming",
+    "webrtc",
+    "websockets",
+    "http",
+    "wave",
+    "wav",
+    "pcm",
+    "opus",
+    "low-latency"
+  ],
+  "author": "@dosy",
+  "bugs": {
+    "url": "https://github.com/crisdosyago/audio-streamer/issues"
+  },
+  "homepage": "https://github.com/crisdosyago/audio-streamer#readme",
+  "dependencies": {
+    "@koush/wrtc": "^0.5.3",
+    "@mapbox/node-pre-gyp": "^1.0.10",
+    "express": "^4.18.1",
+    "ws": "^8.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.19"
+  }
+}
