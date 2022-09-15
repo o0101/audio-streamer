@@ -5,7 +5,7 @@
   "main": "src/server.mjs",
   "type": "module",
   "scripts": {
-    "test": "nodemon src/server.mjs"
+    "test": "node src/server.mjs"
   },
   "repository": {
     "type": "git",
@@ -30,13 +30,14 @@
   },
   "homepage": "https://github.com/crisdosyago/audio-streamer#readme",
   "dependencies": {
-    "@koush/wrtc": "^0.5.3",
-    "@mapbox/node-pre-gyp": "^1.0.10",
-    "exit-on-epipe": "^1.0.1",
-    "express": "^4.18.1",
-    "ws": "^8.8.1"
+    "@dosy/wav": "latest",
+    "@koush/wrtc": "latest",
+    "@mapbox/node-pre-gyp": "latest",
+    "exit-on-epipe": "latest",
+    "express": "latest",
+    "ws": "latest"
   },
   "devDependencies": {
-    "nodemon": "^2.0.19"
+    "nodemon": "latest"
   }
 }

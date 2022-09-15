@@ -9,6 +9,7 @@ import exitOnEpipe from 'exit-on-epipe';
 import express from 'express';
 import WebRTC from '@koush/wrtc';
 import {WebSocketServer} from 'ws';
+import {Reader,Writer} from 'wav';
 
 let app;
 
@@ -25,10 +26,10 @@ function addHandlers() {
       'Content-Type': 'audio/wav'
     });
 
-    const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
 
+    const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
     streamer.pipe(response);
-    exitOnEpipe(response);
+    //exitOnEpipe(response);
 
     streamer.on('close', function() {
       response.end();
@@ -87,22 +88,54 @@ async function startServer() {
 
   httpServer.on('connection', socket => {
     sockets.add(socket);
+    console.log('http connection');
     socket.on('close', () => sockets.delete(socket));
   });
 
   httpServer.on('upgrade', (req, socket, head) => {
     sockets.add(socket);
+    console.log('http upgrade');
     socket.on('close', () => sockets.delete(socket));
   });
 
-  websocketServer.on('connection', async ws => {
-    const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
-    streamer.on('data', data => ws.send(data));
-    //streamer.on('close', () => ws.close());
-    ws.on('message', async msg => {
-      console.log('msg: %s', msg);
-    });
-    ws.on('error', err => console.warn('WebSocket error', err));
+  websocketServer.on('connection',  ws => {
+    try {
+      console.log('ws connection');
+      const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
+      let waveFormat;
+      const waveRider = new Reader();
+
+      waveRider.on('format', format => {
+        try {
+          waveFormat = format;
+          console.log({waveFormat});
+          packetData = new Buffer;
+          waveRider.on('data', data => {
+            const packet = new Writer(format);
+            packet.on('data', data => {
+              packetData = Buffer.concat([packetData, data]);
+              console.log({packetData});
+            });
+            packet.on('end', () => ws.send(packetData));
+            packet.send(data);
+            packet.end();
+          });
+        } catch(e) {
+          console.warn(e);
+        }
+      })
+
+      streamer.pipe(waveRider);
+
+      //streamer.on('data', data => ws.send(data));
+      //streamer.on('close', () => ws.close());
+      ws.on('message', async msg => {
+        console.log('msg: %s', msg);
+      });
+      ws.on('error', err => console.warn('WebSocket error', err));
+    } catch(e) {
+      console.warn(e);
+    }
   });
 
   let resolve, reject;
@@ -121,10 +154,11 @@ async function startServer() {
 
   await startup;
 
-  process.on('SIGINT', shutDown);
-  process.on('exit', shutDown);
-  // nodemon restart
-  process.on('SIGUSR2', shutDown);
+  console.warn('Shutdown is burying errors');
+  //process.on('SIGINT', shutDown);
+  //process.on('exit', shutDown);
+  //// nodemon restart
+  //process.on('SIGUSR2', shutDown);
 
   return httpServer;
 }
