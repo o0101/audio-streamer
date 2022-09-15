@@ -4,12 +4,15 @@ import path from 'path';
 import os from 'os';
 import http from 'http';
 import https from 'https';
+import url from 'url';
 
 import exitOnEpipe from 'exit-on-epipe';
 import express from 'express';
 import WebRTC from '@koush/wrtc';
 import {WebSocketServer} from 'ws';
-import {Reader,Writer} from 'wav';
+import {Reader,Writer} from '@dosy/wav';
+
+const DEBUG = false;
 
 let app;
 
@@ -67,8 +70,8 @@ async function startServer() {
   const secure = GO_SECURE && secure_options.cert && secure_options.key;
   const protocol = secure ? https : http;
   const httpServer = protocol.createServer.apply(protocol, secure ? [secure_options, app] : [app]);
-  const websocketServer = new WebSocketServer({
-    server: httpServer,
+  const websocketServerWaveChunks1 = new WebSocketServer({
+    noServer: true,
     perMessageDeflate: false,
   });
 
@@ -95,10 +98,26 @@ async function startServer() {
   httpServer.on('upgrade', (req, socket, head) => {
     sockets.add(socket);
     console.log('http upgrade');
+    const {pathname} = url.parse(req.url);
+    switch(pathname) {
+      case "/wavechunks1": {
+        websocketServerWaveChunks1.handleUpgrade(req, socket, head, ws => {
+          websocketServerWaveChunks1.emit('connection', ws);
+        });
+      }; break;
+      case "/wavestream1": {
+        console.warn(`Wave stream 2 server is not active yet.`);
+        socket.destroy();
+      }; break;
+      default: {
+        socket.destroy();
+      }; break;
+    }
+
     socket.on('close', () => sockets.delete(socket));
   });
 
-  websocketServer.on('connection',  ws => {
+  websocketServerWaveChunks1.on('connection',  ws => {
     try {
       console.log('ws connection');
       const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
@@ -108,16 +127,16 @@ async function startServer() {
       waveRider.on('format', format => {
         try {
           waveFormat = format;
-          console.log({waveFormat});
-          packetData = new Buffer;
+          DEBUG && console.log({waveFormat});
           waveRider.on('data', data => {
             const packet = new Writer(format);
+            let packetData = Buffer.from([]);
             packet.on('data', data => {
               packetData = Buffer.concat([packetData, data]);
-              console.log({packetData});
+              DEBUG && console.log({packetData});
             });
             packet.on('end', () => ws.send(packetData));
-            packet.send(data);
+            packet.write(data);
             packet.end();
           });
         } catch(e) {

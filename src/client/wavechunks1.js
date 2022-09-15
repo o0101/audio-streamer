@@ -1,7 +1,9 @@
+{
   const audios = [];
   self.audios = audios;
   const wsUri = new URL(location.href);
   wsUri.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  wsUri.pathname = '/wavechunks1';
   const ws = new WebSocket(wsUri);
   ws.binaryType = 'arraybuffer';
   let counter = 1;
@@ -57,3 +59,4 @@
       playing = false;
     }
   }
+}

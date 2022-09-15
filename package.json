@@ -5,7 +5,7 @@
   "main": "src/server.mjs",
   "type": "module",
   "scripts": {
-    "test": "node src/server.mjs"
+    "test": "nodemon src/server.mjs"
   },
   "repository": {
     "type": "git",
