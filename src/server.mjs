@@ -12,7 +12,7 @@ import WebRTC from '@koush/wrtc';
 import {WebSocketServer} from 'ws';
 import {Reader,Writer} from '@dosy/wav';
 
-const DEBUG = false;
+const DEBUG = true;
 
 let app;
 
@@ -74,6 +74,10 @@ async function startServer() {
     noServer: true,
     perMessageDeflate: false,
   });
+  const websocketServerWaveStream2 = new WebSocketServer({
+    noServer: true,
+    perMessageDeflate: false,
+  });
 
   let shuttingDown = false;
 
@@ -105,9 +109,10 @@ async function startServer() {
           websocketServerWaveChunks1.emit('connection', ws);
         });
       }; break;
-      case "/wavestream1": {
-        console.warn(`Wave stream 2 server is not active yet.`);
-        socket.destroy();
+      case "/wavestream2": {
+        websocketServerWaveStream2.handleUpgrade(req, socket, head, ws => {
+          websocketServerWaveStream2.emit('connection', ws);
+        });
       }; break;
       default: {
         socket.destroy();
@@ -119,7 +124,7 @@ async function startServer() {
 
   websocketServerWaveChunks1.on('connection',  ws => {
     try {
-      console.log('ws connection');
+      console.log('ws (wave chunks) connection (server #1)');
       const streamer = fs.createReadStream(path.resolve('assets', 'test.wav'));
       let waveFormat;
       const waveRider = new Reader();
@@ -148,6 +153,38 @@ async function startServer() {
 
       //streamer.on('data', data => ws.send(data));
       //streamer.on('close', () => ws.close());
+      ws.on('message', async msg => {
+        console.log('msg: %s', msg);
+      });
+      ws.on('error', err => console.warn('WebSocket error', err));
+    } catch(e) {
+      console.warn(e);
+    }
+  });
+
+  websocketServerWaveStream2.on('connection',  ws => {
+    try {
+      console.log('ws (wave header + pcm stream) connection (server #2)');
+      const streamer = fs.createReadStream(path.resolve('assets', 'test2.wav'));
+      let waveFormat;
+      const waveRider = new Reader();
+
+      waveRider.on('format', format => {
+        try {
+          waveFormat = format;
+          DEBUG && console.log({waveFormat});
+          ws.send(JSON.stringify({format}));
+          waveRider.on('data', data => {
+            console.log(`sending`, data);
+            ws.send(data);
+          });
+        } catch(e) {
+          console.warn(e);
+        }
+      })
+
+      streamer.pipe(waveRider);
+
       ws.on('message', async msg => {
         console.log('msg: %s', msg);
       });
